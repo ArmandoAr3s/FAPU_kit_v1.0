@@ -1,0 +1,22 @@
+name: INBOX 24h Enforcer
+on:
+  schedule: [ { cron: '0 */4 * * *' } ]
+  workflow_dispatch:
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: python3 scripts/inbox_enforcer.py --hours 24 --create-report || echo 'stale'
+      - uses: peter-evans/create-issue-from-file@v5
+        if: always()
+        with:
+          title: 'INBOX Enforcer: stale items in 80_INBOX'
+          content-filepath: ./inbox_report.md
+          labels: automated,inbox

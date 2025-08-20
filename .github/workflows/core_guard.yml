@@ -1,0 +1,32 @@
+name: CORE Guard
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"; head="${{ github.event.pull_request.head.sha }}";
+          else
+            base="$(git rev-parse HEAD~1)"; head="$(git rev-parse HEAD)";
+          fi
+          echo "BASE=$base" >> $GITHUB_ENV
+          echo "HEAD=$head" >> $GITHUB_ENV
+          git diff --name-only "$base" "$head" | grep '^00_CORE/' || true
+      - name: Enforce rules
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -e
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep '^00_CORE/' || true)
+          if [ -z "$CHANGED" ]; then echo 'No changes in 00_CORE'; exit 0; fi
+          if [ "$EVENT_NAME" = "push" ]; then echo '::error::Direct pushes to main changing 00_CORE are not allowed.'; exit 1; fi
+          if echo "$PR_LABELS" | grep -q '"name": "core-change"'; then echo 'Label ok'; else echo '::error::PR must have label core-change'; exit 1; fi
